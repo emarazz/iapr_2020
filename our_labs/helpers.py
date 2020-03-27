@@ -12,7 +12,7 @@ from skimage import exposure
 
 
 
-def plot_brain(im, original_size = True, img_size = (6,6)): 
+def plot_brain(im, original_size = True, img_size = (6,6), label = 'MRI brain image ({} px, {} px)'): 
     im_h, im_w = im.shape
     if original_size:
         dpi = plt.rcParams['figure.dpi']
@@ -20,7 +20,7 @@ def plot_brain(im, original_size = True, img_size = (6,6)):
     else:
         fig, ax = plt.subplots(1, 1, figsize=img_size) 
     ax.imshow(im, cmap='gray')
-    ax.set_title('MRI brain image ({} px, {} px)'.format(im_h, im_w))
+    ax.set_title(label.format(im_h, im_w))
     ax.axis('off')
     plt.show()
     return
