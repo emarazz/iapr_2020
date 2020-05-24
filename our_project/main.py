@@ -89,7 +89,15 @@ def windows_overlap(i_1_min, j_1_min, i_1_max, j_1_max, i_2_min, j_2_min, i_2_ma
                       and ((j_1_min <= j_2_min <= j_1_max) or (j_1_min <= j_2_max <= j_1_max)))
     return box_1_in_box_2 or box_2_in_box_1
 
-def remove_overlapping_windows_with_same_window_side(windows):
+def find_window_with_most_white_pixels(image, i_1_min, j_1_min, i_1_max, j_1_max, i_2_min, j_2_min, i_2_max, j_2_max):
+    window_1 = image[i_1_min:i_1_max, j_1_min:j_1_max]
+    window_2 = image[i_2_min:i_2_max, j_2_min:j_2_max]
+    if np.count_nonzero(window_1) >= np.count_nonzero(window_2):
+        return 0
+    else:
+        return 1   
+
+def remove_overlapping_windows_with_same_window_side(image, windows):
     windows_list = list(windows.copy())
     window_side = windows_list[0][2]
     to_be_removed = []
@@ -102,7 +110,13 @@ def remove_overlapping_windows_with_same_window_side(windows):
                 i_2 = windows_list[l][1]
                 if windows_overlap(i_1, j_1, i_1+window_side, j_1+window_side, 
                                    i_2, j_2, i_2+window_side, j_2+window_side):
-                    to_be_removed.append((j_2, i_2, window_side))
+                    window_to_be_kept = find_window_with_most_white_pixels(image, 
+                                                i_1, j_1, i_1+window_side, j_1+window_side, 
+                                                i_2, j_2, i_2+window_side, j_2+window_side)
+                    if window_to_be_kept == 0:
+                        to_be_removed.append((j_2, i_2, window_side))
+                    else: 
+                        to_be_removed.append((j_1, i_1, window_side))
     to_be_removed = set(to_be_removed)
     return windows.difference(to_be_removed)
 
@@ -195,10 +209,14 @@ if __name__=="__main__":
     cv.destroyAllWindows()
     
     first_frame = frames[0]
+    last_frame = frames[-1]
     (im_h, im_w) = first_frame.shape[:2]
     
     first_frame_gray = 255-cv.cvtColor(first_frame, cv.COLOR_BGR2GRAY)
+    last_frame_gray = 255-cv.cvtColor(last_frame, cv.COLOR_BGR2GRAY)
+    
     first_frame_binarized = binarize(first_frame_gray, 140)
+    last_frame_binarized = binarize(last_frame_gray, 140)
     
     ## 0.0 TRACING THE ARROW
     first_frame_normalized = normalize_intensity(first_frame, linear=True)
@@ -214,16 +232,18 @@ if __name__=="__main__":
     arrow_locations = [np.round(np.mean(arrow_coords, axis=1)).astype(int) for arrow_coords in arrows_coords]
 
     ### 1. CONSTRUCTING BOUNDING BOXES
-    symbol_windows = []
-    for k in range(104, -6, -10):
-        if len(detection(first_frame_binarized, stride=int(k/2), window_side=k)) == 0:
-            min_window_side = k+10
+    for k in range(80, 40, -8):
+        if len(detection(first_frame_binarized, stride=2, window_side=k)) == 0:
+            min_window_side = k+8
             break
+        else:
+            min_window_side = 32
         
-    windows_final = detection(first_frame_binarized, stride=int(min_window_side/2), window_side=min_window_side)
+    windows_final = detection(first_frame_binarized, stride=2, window_side=min_window_side)
+    windows_final = remove_overlapping_windows_with_same_window_side(first_frame_binarized, windows_final)
 
-    for k in range(min_window_side+10, 114, 10):
-        windows_temp = detection(first_frame_binarized, stride=int(k/2), window_side=k)
+    for k in range(min_window_side+8, 80, 8):
+        windows_temp = detection(first_frame_binarized, stride=2, window_side=k)
         to_be_removed = set()
         for (j_1, i_1, window_side_1) in windows_final:
             for (j_2, i_2, window_side_2) in windows_temp:
@@ -233,8 +253,14 @@ if __name__=="__main__":
 
         windows_temp = windows_temp.difference(to_be_removed)
         if windows_temp != set():
-            windows_temp = remove_overlapping_windows_with_same_window_side(windows_temp)
+            windows_temp = remove_overlapping_windows_with_same_window_side(first_frame_binarized, windows_temp)
         windows_final = windows_final.union(windows_temp)
+        
+    to_be_removed = set()
+    for (j, i, window_side) in windows_final:
+        if np.count_nonzero(last_frame_binarized[i:i+window_side,j:j+window_side]) < 50:
+            to_be_removed.add((j, i, window_side))
+    windows_final = windows_final.difference(to_be_removed)
 
     windows_final = list(windows_final)
     
@@ -309,6 +335,7 @@ if __name__=="__main__":
     ### 5. RE-MAKING THE VIDEO
     frames_newvid = []
     position = (30, 450)
+    tracking_color = (191, 16, 21)
 
     for i in range(len(frames)):
         frame = frames[i].copy()
@@ -327,7 +354,8 @@ if __name__=="__main__":
         for j in range(i-3):
             location_1 = (arrow_locations[j][1], arrow_locations[j][0])
             location_2 = (arrow_locations[j+1][1], arrow_locations[j+1][0])
-            cv.line(frame_newvid, location_1, location_2, [0, 80, 280, 255], 5) 
+            cv.line(frame_newvid, location_1, location_2, tracking_color, 1) 
+            cv.circle(frame_newvid, location_2, radius=3, color=tracking_color, thickness=-1)
     
         frames_newvid.append(cv.cvtColor(frame_newvid, cv.COLOR_BGR2RGB))
 
