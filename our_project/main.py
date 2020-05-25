@@ -1,8 +1,6 @@
-import skimage.io
 import numpy as np
 from numpy.fft import fft
 import cv2 as cv
-import matplotlib.pyplot as plt
 from random import randint
 from skimage.transform import rescale, rotate
 from skimage import measure
@@ -36,8 +34,8 @@ def normalize_intensity(image, linear=True):
     for i in range(image.shape[2]):
         #min_intensity = np.amin(image[:,:,:])
         #max_intensity = np.amax(image[:,:,:])
-        min_intensity = np.percentile(image[:,:,i],5)
-        max_intensity = np.percentile(image[:,:,i],50)
+        min_intensity = np.percentile(image[:,:,i],0)
+        max_intensity = np.percentile(image[:,:,i],100)
         diff = max_intensity - min_intensity
         avg = np.mean(image[:,:,i])
         if min_intensity != max_intensity:
@@ -283,17 +281,18 @@ if __name__=="__main__":
         pixels_center = np.round(np.mean(pixels_locations, axis=1)).astype(int)
     
         pixels = first_frame_normalized[pixels_locations[0,:], pixels_locations[1,:]]
-        black_pixels = np.logical_and.reduce((pixels[:,0] < 100, 
-                                          pixels[:,1] < 100, 
-                                          pixels[:,2] < 100))
+        black_pixels = np.logical_and.reduce((pixels[:,0] < 150, 
+                                          pixels[:,1] < 150, 
+                                          pixels[:,2] < 80))
         nb_pixels = pixels_locations.shape[1]
         nb_black_pixels = np.sum(black_pixels)
-        if (nb_black_pixels / nb_pixels < 0.60):
+        ratio_black = nb_black_pixels / nb_pixels
+        if (ratio_black < 0.5):
             character_type = 'operator'
         else:
             character_type = 'digit'
     
-        boxes_dicts.append(dict(image_box=image_box, center=pixels_center, character_type=character_type))
+        boxes_dicts.append(dict(image_box=image_box, center=pixels_center, character_type=character_type, ratio_black=ratio_black)) # The last attribute ratio_black can help with calibrating the mask
         
     ### 3. CLASSIFICATION
     ## 3.1 DIGIT CLASSIFIER: TRANSLATED/SCALED/ROTATED MNIST CNN
