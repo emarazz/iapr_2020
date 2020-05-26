@@ -403,7 +403,7 @@ if __name__=="__main__":
         char_sequence_list.append(char_sequence)
         
     assert(char_sequence[-1] == '=')
-    # result = eval(char_sequence[:-1]) # We discard the '=' operator and then evaluate the formula
+    result = eval(char_sequence[:-1]) # We discard the '=' operator and then evaluate the formula
     
     ### 5. RE-MAKING THE VIDEO
     frames_newvid = []
@@ -413,8 +413,9 @@ if __name__=="__main__":
     for i in range(len(frames)):
         frame = frames[i].copy()
         formula = char_sequence_list[i]
-        #if formula[-1] == '=':
-        #    formula += str(result)
+        if formula:
+            if formula[-1] == '=':
+                formula += str(result)
     
         frame_newvid = cv.putText(frame,
                                   'Formula: '+formula,
