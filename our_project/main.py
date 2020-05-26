@@ -5,12 +5,21 @@ from random import randint
 from skimage.transform import rescale, rotate
 from skimage import measure
 
+import torch
+from torch import nn
+from torch.nn import functional as F
+from torch import optim
+import torchvision
+from torchvision import transforms
+import torchvision.transforms.functional as TF
+
 import argparse
 
 parser = argparse.ArgumentParser()
 
 parser.add_argument('--input', required=True, help='path to input video')
 parser.add_argument('--output', required=True, help='path to result video')
+parser.add_argument('--degree', default=0)
 
 args = parser.parse_args()
 
@@ -184,9 +193,68 @@ def classify_operator(image):
         else:
             return '*'
 
+### CNN architecture
+
+class NClassifierNet5(nn.Module):
+    def __init__(self):
+
+        super(NClassifierNet5, self).__init__()
+        self.conv1 = nn.Conv2d(1,32, kernel_size = 3) # 28 -> 26 (13) / 14 -> 12
+        self.bn1 = nn.BatchNorm2d(num_features = 32) 
+        self.conv2 = nn.Conv2d(32,64, kernel_size = 3) # 26 -> 24 (13 -> 11 (5))/ 12 -> 10
+        self.bn2 = nn.BatchNorm2d(num_features = 64)
+        self.conv3 = nn.Conv2d(64,128, kernel_size = 3) # 24 -> 22 / 10 -> 8
+        self.bn3 = nn.BatchNorm2d(num_features = 128)
+        self.conv4 = nn.Conv2d(128,256, kernel_size = 3)
+        self.bn4 = nn.BatchNorm1d(num_features = 256*2*2)
+        self.fc2 = nn.Linear(256*2*2,9)
+
+    def forward(self, xA):
+
+        A = F.relu(F.max_pool2d(self.conv1(xA),kernel_size = 2, stride = 2))
+        #print(A.shape)
+        A = F.relu(F.max_pool2d(self.conv2(self.bn1(A)),kernel_size = 2, stride = 2))
+        #print(A.shape)
+        A = F.relu(F.max_pool2d(self.conv3(self.bn2(A)),kernel_size = 2, stride = 2))
+        #print(A.shape)
+        A = F.relu(F.max_pool2d(self.conv4(self.bn3(A)),kernel_size = 2, stride = 2))
+        #print(A.shape)
+        A = F.leaky_relu(self.fc2(self.bn4(A.view(-1, 256*2*2))))
+        #print(A.shape)
+
+        return A
+
+def classify_number(padded_box):
+    device = 'cpu'
+    PATH = './collab_noNines_cnn5_TTT_bs1000_ne50.pth'
+
+    eta = 1e-3
+    model, criterion = NClassifierNet5(), nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=eta, betas=[0.99,0.999])
+
+    model.to(device)
+    criterion.to(device)
+
+    checkpoint = torch.load(PATH, map_location=torch.device(device))
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    epoch = checkpoint['epoch']
+    loss = checkpoint['loss']
+    
+    # Predict
+    model.eval()
+    img = pad(padded_box/255.,64)
+    image_tensor = torch.Tensor(img).view(-1,1,64,64).float().to(device)
+    guess = model(image_tensor)
+    prob,output = torch.max(guess,1)
+    num = str(int(output))
+    return num
+
+
 if __name__=="__main__":
     input_path = args.input
     output_path = args.output
+    test_degree = float(args.degree)
     
     ### 0. EXTRACTING THE FRAMES
     cap = cv.VideoCapture(input_path)
@@ -197,11 +265,17 @@ if __name__=="__main__":
         ret, frame = cap.read()
         if not ret:
             break
+        
+        if (test_degree != 0):
+            frame = rotate(frame,test_degree).astype('float32')*255.
+            frame = frame.astype('uint8')
 
         frames.append(cv.cvtColor(frame, cv.COLOR_BGR2RGB))
-
+    
         if cv.waitKey(1) & 0xFF == ord('q'):
             break
+
+
 
     cap.release()
     cv.destroyAllWindows()
@@ -306,7 +380,7 @@ if __name__=="__main__":
         if character_type == 'operator':
             dct['value'] = classify_operator(image_box)
         else:
-            dct['value'] = '$'
+            dct['value'] = classify_number(image_box)
             
     ### 4. TRACING THE FORMULA
     char_sequence = '' # This string will represent the traced formula
