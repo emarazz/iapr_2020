@@ -2,8 +2,9 @@ import numpy as np
 from numpy.fft import fft
 import cv2 as cv
 from random import randint
-from skimage.transform import rescale, rotate
+from skimage.transform import rescale, rotate, resize
 from skimage import measure
+
 
 import torch
 from torch import nn
@@ -20,6 +21,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--input', required=True, help='path to input video')
 parser.add_argument('--output', required=True, help='path to result video')
 parser.add_argument('--degree', default=0)
+parser.add_argument('--flag_nn', default=False)
 
 args = parser.parse_args()
 
@@ -244,6 +246,9 @@ def classify_number(padded_box):
     # Predict
     model.eval()
     img = pad(padded_box/255.,64)
+    #img = resize(padded_box/255., (64, 64), anti_aliasing=True)
+
+
     image_tensor = torch.Tensor(img).view(-1,1,64,64).float().to(device)
     guess = model(image_tensor)
     prob,output = torch.max(guess,1)
@@ -255,6 +260,7 @@ if __name__=="__main__":
     input_path = args.input
     output_path = args.output
     test_degree = float(args.degree)
+    flag_nn = args.flag_nn
     
     ### 0. EXTRACTING THE FRAMES
     cap = cv.VideoCapture(input_path)
@@ -377,11 +383,14 @@ if __name__=="__main__":
     for dct in boxes_dicts:
         character_type = dct['character_type']
         image_box = dct['image_box']
-        if character_type == 'operator':
-            dct['value'] = classify_operator(image_box)
+        if not flag_nn:
+            if character_type == 'operator':
+                dct['value'] = classify_operator(image_box)
+            else:
+                dct['value'] = classify_number(image_box)
         else:
             dct['value'] = classify_number(image_box)
-            
+
     ### 4. TRACING THE FORMULA
     char_sequence = '' # This string will represent the traced formula
     char_sequence_list = [] # This list will represent at each index 
