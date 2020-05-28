@@ -214,22 +214,16 @@ class NClassifierNet5(nn.Module):
     def forward(self, xA):
 
         A = F.relu(F.max_pool2d(self.conv1(xA),kernel_size = 2, stride = 2))
-        #print(A.shape)
         A = F.relu(F.max_pool2d(self.conv2(self.bn1(A)),kernel_size = 2, stride = 2))
-        #print(A.shape)
         A = F.relu(F.max_pool2d(self.conv3(self.bn2(A)),kernel_size = 2, stride = 2))
-        #print(A.shape)
         A = F.relu(F.max_pool2d(self.conv4(self.bn3(A)),kernel_size = 2, stride = 2))
-        #print(A.shape)
         A = self.fc2(self.bn4(A.view(-1, 256*2*2)))
-        #print(A.shape)
-
+       
         return A
 
 def classify_number(padded_box):
     device = 'cpu'
-    #PATH = './collab_noNines_cnn5_TTT_bs1000_ne50.pth'
-    PATH = './collab_noNines_cnn5_TTTcrossAug0.01val_bs1000_ne120.pth'
+    PATH = './noNines_cnn5_TTT_Aug_bs1000_ne120.pth'
 
     eta = 1e-3
     model, criterion = NClassifierNet5(), nn.CrossEntropyLoss()
