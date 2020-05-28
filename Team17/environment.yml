@@ -1,0 +1,12 @@
+name: iapr_2020_fpro
+channels:
+  - defaults
+dependencies:
+  - jupyter
+  - torchvision
+  - pytorch
+  - opencv
+  - matplotlib
+  - scipy
+  - scikit-learn
+  - scikit-image
