@@ -229,7 +229,7 @@ class NClassifierNet5(nn.Module):
 def classify_number(padded_box):
     device = 'cpu'
     #PATH = './collab_noNines_cnn5_TTT_bs1000_ne50.pth'
-    PATH = './collab_noNines_cnn5_TTTcrossAug0.01val_bs1000_ne120.pth'
+    PATH = './noNines_cnn5_TTT_Aug_bs1000_ne120.pth'
 
     eta = 1e-3
     model, criterion = NClassifierNet5(), nn.CrossEntropyLoss()
