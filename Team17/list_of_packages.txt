@@ -1,0 +1,6 @@
+numpy 
+cv2
+random
+skimage
+torch
+torchvision
